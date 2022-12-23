@@ -30,7 +30,8 @@
                 v-for="stock in Object.values(user.stocks)"
                 :key="stock.title"
             >
-              {{stock.label}} - {{stock.count}}
+<!--              {{console.log(this.prices[stock.label].slice(1))}}-->
+              {{stock.label}} - {{stock.count}} - {{ Object.values(this.prices).length !== 0 && this.prices[stock.label]? Math.round(stock.count * parseFloat(this.prices[stock.label].slice(1)).toFixed(2) * 100 - stock.sum * 100) / 100: 'Не торгуется' }}
             </v-list-item>
           </v-list-item-group>
         </v-list>
@@ -54,7 +55,9 @@ export default {
   data() {
     return {
       brokers: null,
-      socket: socket
+      socket: socket,
+      prices: {},
+      stocks: []
     }
   },
   methods: {
@@ -76,11 +79,41 @@ export default {
         let broker = this.brokers.filter(el => el.name === data.name)
         broker.balance = data.balance
       })
+    },
+    // async getBrokerStocks() {
+    //
+    //   const resp = await axios.get(`http://localhost:3000/brokers/stocks/${this.$route.params.name}`)
+    //   for (let el of resp.data) {
+    //     this.objBrokerStocks[el.label] = el
+    //     this.brokerStocks.push(el)
+    //   }
+    // },
+    async loadStocks() {
+      const resp = await axios.get('http://localhost:3000/market')
+      this.stocks = resp.data.filter((el) => el.status).map(el => el.label)
+      console.log(this.stocks)
+    },
+    priceUpdate() {
+      for (let label of this.stocks) {
+        console.log(label)
+        this.socket.emit('join', {room: label})
+        this.socket.on(label, (data) => {
+          console.log(data)
+          this.prices[label] = data['close']
+        })
+      }
+    },
+    async loadAll() {
+      await this.loadStocks()
+      this.priceUpdate()
     }
   },
   mounted() {
     this.loadBrokers()
     this.balanceUpdate()
+    this.loadAll()
+    // this.loadStocks()
+    // this.priceUpdate()
   },
   computed: {
     brok() {
